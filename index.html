@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TOOL ALL BÀN MD5 - CYBER PRO</title>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+
+body{
+height:100vh;
+display:flex;
+justify-content:center;
+align-items:center;
+font-family:Segoe UI, sans-serif;
+background:#050510;
+color:white;
+overflow:hidden;
+}
+
+/* CYBER GRID BACKGROUND */
+body::before{
+content:"";
+position:fixed;
+width:200%;
+height:200%;
+background:
+linear-gradient(#00ffcc22 1px,transparent 1px),
+linear-gradient(90deg,#00ffcc22 1px,transparent 1px);
+background-size:40px 40px;
+animation:gridMove 10s linear infinite;
+z-index:-2;
+}
+
+@keyframes gridMove{
+0%{transform:translate(0,0)}
+100%{transform:translate(-40px,-40px)}
+}
+
+/* Glow ambient */
+body::after{
+content:"";
+position:fixed;
+width:100%;
+height:100%;
+background:radial-gradient(circle at center,#00ffcc22,transparent 70%);
+z-index:-1;
+}
+
+.container{
+width:520px;
+background:rgba(0,0,0,0.6);
+backdrop-filter:blur(25px);
+border-radius:25px;
+padding:30px;
+box-shadow:0 0 80px #00ffcc55;
+}
+
+.title{
+text-align:center;
+font-size:26px;
+font-weight:900;
+margin-bottom:20px;
+letter-spacing:2px;
+color:#00ffcc;
+text-shadow:0 0 20px #00ffcc;
+}
+
+input{
+width:100%;
+padding:14px;
+border:none;
+border-radius:15px;
+margin-top:10px;
+background:#0a0a1f;
+color:#00ffcc;
+text-align:center;
+}
+
+button{
+margin-top:12px;
+padding:14px;
+width:100%;
+border:none;
+border-radius:15px;
+cursor:pointer;
+font-weight:bold;
+transition:.3s;
+}
+
+.mainBtn{
+background:#00ffcc;
+color:black;
+}
+
+.choiceWrap{
+display:flex;
+gap:10px;
+}
+
+.choiceBtn{
+flex:1;
+background:#111;
+color:#00ffcc;
+border:1px solid #00ffcc55;
+}
+
+.choiceBtn:hover{
+background:#00ffcc;
+color:black;
+box-shadow:0 0 25px #00ffcc;
+}
+
+.result{
+margin-top:30px;
+font-size:100px;
+text-align:center;
+opacity:0;
+transform:scale(.6);
+transition:.4s;
+}
+
+.show{
+opacity:1;
+transform:scale(1);
+}
+
+.tai{
+color:#00ff99;
+text-shadow:0 0 40px #00ff99,0 0 80px #00ff99;
+}
+
+.xiu{
+color:#ff4444;
+text-shadow:0 0 40px #ff0000,0 0 80px #ff0000;
+}
+
+.status{
+margin-top:15px;
+font-size:12px;
+text-align:center;
+opacity:.7;
+}
+
+canvas{
+position:fixed;
+top:0;
+left:0;
+pointer-events:none;
+}
+
+.hidden{display:none;}
+</style>
+</head>
+<body>
+
+<canvas id="particle"></canvas>
+
+<div class="container">
+
+<div id="keyScreen">
+<div class="title">CYBER HASH ENGINE</div>
+<input id="keyInput" placeholder="Nhập KEY">
+<button class="mainBtn" onclick="checkKey()">XÁC NHẬN</button>
+<div id="keyMsg" class="status"></div>
+</div>
+
+<div id="toolScreen" class="hidden">
+<div class="title">MD5 / SHA256 ANALYZER</div>
+<input id="hash" placeholder="Paste hash 32 / 64 ký tự">
+<button class="mainBtn" onclick="analyze()">PHÂN TÍCH</button>
+
+<div id="result" class="result"></div>
+
+<div class="choiceWrap">
+<button class="choiceBtn" onclick="submitResult(true)">BÚ</button>
+<button class="choiceBtn" onclick="submitResult(false)">GÃY</button>
+</div>
+
+<div id="status" class="status"></div>
+</div>
+
+</div>
+
+<audio id="soundWin" src="https://assets.mixkit.co/sfx/preview/mixkit-game-success-alert-2039.wav"></audio>
+<audio id="soundLose" src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-retro-game-over-213.wav"></audio>
+<audio id="soundSwitch" src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-retro-changing-tab-206.wav"></audio>
+
+<script>
+
+/* ================= DATABASE ================= */
+let db = JSON.parse(localStorage.getItem("KEY_DB")||"{}");
+if(!db.keys) db.keys={};
+if(!db.bannedIPs) db.bannedIPs=[];
+
+let ip=sessionStorage.getItem("IP")||("IP_"+Math.random().toString(36).substring(2,8));
+sessionStorage.setItem("IP",ip);
+
+/* ================= KEY ================= */
+function checkKey(){
+let key=document.getElementById("keyInput").value.trim().toUpperCase();
+if(!db.keys[key]) return document.getElementById("keyMsg").innerText="Key không tồn tại";
+if(db.bannedIPs.includes(ip)) return document.getElementById("keyMsg").innerText="IP bị ban";
+if(Date.now()/1000>db.keys[key].expire) return document.getElementById("keyMsg").innerText="Key hết hạn";
+
+db.keys[key].logins.push({ip,time:new Date().toLocaleString()});
+localStorage.setItem("KEY_DB",JSON.stringify(db));
+
+document.getElementById("keyScreen").classList.add("hidden");
+document.getElementById("toolScreen").classList.remove("hidden");
+}
+
+/* ================= ULTRA ENGINE ================= */
+
+let lose=0,mode=0,total=0,win=0,history=[];
+
+/* layer 1: rolling hash */
+function layer1(hash){
+let h=0;
+for(let i=0;i<hash.length;i++){
+h=(h*31+hash.charCodeAt(i))>>>0;
+}
+return h;
+}
+
+/* layer 2: bit shuffle */
+function layer2(v){
+v ^= (v << 13);
+v ^= (v >> 17);
+v ^= (v << 5);
+return v>>>0;
+}
+
+/* layer 3: time-seed mixing */
+function layer3(v){
+let seed=Math.floor(Date.now()/10000); 
+return (v ^ seed)>>>0;
+}
+
+/* layer 4: adaptive bias */
+function layer4(v){
+let bias=history.slice(-6).reduce((a,b)=>a+b,0);
+return (v + bias*777)>>>0;
+}
+
+function engine(hash){
+
+let v=layer1(hash);
+
+if(mode>=1) v=layer2(v);
+if(mode>=2) v=layer3(v);
+if(mode>=3) v=layer4(v);
+
+return (v % 2)===0;
+}
+
+/* ================= ANALYZE ================= */
+
+function analyze(){
+let hash=document.getElementById("hash").value.trim().toLowerCase();
+if(!/^[0-9a-f]{32}$|^[0-9a-f]{64}$/.test(hash)) return alert("Hash sai");
+
+let result=engine(hash);
+let box=document.getElementById("result");
+
+box.classList.remove("tai","xiu","show");
+
+setTimeout(()=>{
+if(result){
+box.innerText="TÀI";
+box.classList.add("tai","show");
+explode(80);
+glitch(box);
+}else{
+box.innerText="XỈU";
+box.classList.add("xiu","show");
+glitch(box);
+}
+},150);
+}
+
+/* ================= SUBMIT ================= */
+
+function submitResult(isWin){
+
+total++;
+history.push(isWin?1:0);
+
+if(isWin){
+win++;
+lose=0;
+document.getElementById("soundWin").play();
+}else{
+lose++;
+document.getElementById("soundLose").play();
+
+if(lose>=2){
+mode++;
+if(mode>3) mode=3;
+lose=0;
+flashMode();
+document.getElementById("soundSwitch").play();
+}
+}
+
+updateStatus();
+}
+
+function updateStatus(){
+let percent= total?((win/total)*100).toFixed(1):0;
+document.getElementById("status").innerText=
+"ENGINE: "+["BASE","BIT-SHIFT","TIME-SEED","ADAPTIVE"][mode]+
+" | Win: "+percent+"%";
+}
+
+/* ================= VISUAL BOOST ================= */
+
+function flashMode(){
+document.body.style.transition="0.2s";
+document.body.style.background="#001f1f";
+setTimeout(()=>{
+document.body.style.background="#050510";
+},200);
+}
+
+/* glitch effect */
+function glitch(el){
+el.style.animation="none";
+void el.offsetWidth;
+el.style.animation="glitchAnim 0.4s";
+}
+
+/* PARTICLE */
+const canvas=document.getElementById("particle");
+const ctx=canvas.getContext("2d");
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+
+let particles=[];
+
+function explode(count){
+for(let i=0;i<count;i++){
+particles.push({
+x:canvas.width/2,
+y:canvas.height/2,
+dx:(Math.random()-0.5)*12,
+dy:(Math.random()-0.5)*12,
+life:80
+});
+}
+}
+
+function animate(){
+ctx.clearRect(0,0,canvas.width,canvas.height);
+particles.forEach((p,i)=>{
+p.x+=p.dx;
+p.y+=p.dy;
+p.life--;
+ctx.fillStyle="#00ffcc";
+ctx.fillRect(p.x,p.y,3,3);
+if(p.life<=0) particles.splice(i,1);
+});
+requestAnimationFrame(animate);
+}
+animate();
+
+/* glitch keyframe inject */
+let style=document.createElement("style");
+style.innerHTML=`
+@keyframes glitchAnim{
+0%{transform:translate(0)}
+20%{transform:translate(-3px,2px)}
+40%{transform:translate(3px,-2px)}
+60%{transform:translate(-2px,1px)}
+80%{transform:translate(2px,-1px)}
+100%{transform:translate(0)}
+}`;
+document.head.appendChild(style);
+
+</script>
+
+
+</body>
+</html>
